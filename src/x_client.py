@@ -1,3 +1,4 @@
+import base64
 import json
 import os
 
@@ -7,8 +8,6 @@ from config import X_CLIENT_ID, X_CLIENT_SECRET
 TWEET_URL = "https://api.x.com/2/tweets"
 TOKEN_FILE = os.path.join(os.path.dirname(__file__), "..", ".x_tokens.json")
 TOKEN_URL = "https://api.x.com/2/oauth2/token"
-
-import base64
 
 
 def _load_tokens() -> dict:
@@ -25,10 +24,12 @@ def _save_tokens(data: dict):
     path = os.path.normpath(TOKEN_FILE)
     with open(path, "w") as f:
         json.dump(data, f, indent=2)
+    print("Tokens saved to disk.")
 
 
 def _refresh_access_token(refresh_token: str) -> dict:
     """Use refresh token to get a new access token."""
+    print("Access token expired, refreshing...")
     auth_header = base64.b64encode(
         f"{X_CLIENT_ID}:{X_CLIENT_SECRET}".encode()
     ).decode()
@@ -46,6 +47,7 @@ def _refresh_access_token(refresh_token: str) -> dict:
         timeout=15,
     )
     response.raise_for_status()
+    print("Refresh successful.")
     return response.json()
 
 
@@ -64,10 +66,17 @@ def post_tweet(text: str) -> dict:
         timeout=15,
     )
 
-    # If token expired, try refreshing
-    if response.status_code == 401 and "refresh_token" in tokens:
+    # If token expired or rejected, try refreshing.
+    # X returns 401 for expired tokens, but 403 "Unsupported Authentication"
+    # for invalid/corrupted tokens — both mean we need a new access token.
+    needs_refresh = response.status_code == 401 or (
+        response.status_code == 403
+        and "unsupported-authentication" in response.text.lower()
+    )
+    if needs_refresh and "refresh_token" in tokens:
         new_tokens = _refresh_access_token(tokens["refresh_token"])
         _save_tokens(new_tokens)
+        print("Retrying tweet...")
         response = requests.post(
             TWEET_URL,
             headers={
@@ -78,5 +87,8 @@ def post_tweet(text: str) -> dict:
             timeout=15,
         )
 
+    if not response.ok:
+        print(f"X API error: {response.status_code}")
+        print(response.text)
     response.raise_for_status()
     return response.json()

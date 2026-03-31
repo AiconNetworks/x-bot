@@ -1,5 +1,6 @@
 .env
 .x_tokens.json
+.x_tokens.json.bak
 .DS_Store
 __pycache__/
 *.pyc
