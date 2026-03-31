@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "aicon-mvp"
+version = "0.1.0"
+description = "Minimal MVP for OpenClaw + X approval posting flow"
+authors = ["You <you@example.com>"]
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.11"
+python-dotenv = "^1.0.1"
+requests = "^2.32.3"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.2"
+ruff = "^0.6.9"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
