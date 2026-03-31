@@ -1,4 +1,5 @@
 .env
+.x_tokens.json
 __pycache__/
 *.pyc
 .venv/

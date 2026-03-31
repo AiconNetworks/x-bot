@@ -1,72 +1,82 @@
-import hashlib
-import hmac
-import time
-import base64
-import urllib.parse
-import uuid
+import json
+import os
 
 import requests
-from config import X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_SECRET
+from config import X_CLIENT_ID, X_CLIENT_SECRET
 
-TWEET_URL = "https://api.twitter.com/2/tweets"
+TWEET_URL = "https://api.x.com/2/tweets"
+TOKEN_FILE = os.path.join(os.path.dirname(__file__), "..", ".x_tokens.json")
+TOKEN_URL = "https://api.x.com/2/oauth2/token"
+
+import base64
 
 
-def _oauth_header(method: str, url: str, body_params: dict | None = None) -> str:
-    """Build an OAuth 1.0a Authorization header."""
-    oauth_params = {
-        "oauth_consumer_key": X_API_KEY,
-        "oauth_nonce": uuid.uuid4().hex,
-        "oauth_signature_method": "HMAC-SHA1",
-        "oauth_timestamp": str(int(time.time())),
-        "oauth_token": X_ACCESS_TOKEN,
-        "oauth_version": "1.0",
-    }
+def _load_tokens() -> dict:
+    path = os.path.normpath(TOKEN_FILE)
+    if not os.path.exists(path):
+        raise FileNotFoundError(
+            "No tokens found. Run 'poetry run python src/x_oauth_setup.py' first."
+        )
+    with open(path) as f:
+        return json.load(f)
 
-    all_params = {**oauth_params}
-    if body_params:
-        all_params.update(body_params)
 
-    param_string = "&".join(
-        f"{urllib.parse.quote(k, safe='')}={urllib.parse.quote(v, safe='')}"
-        for k, v in sorted(all_params.items())
-    )
+def _save_tokens(data: dict):
+    path = os.path.normpath(TOKEN_FILE)
+    with open(path, "w") as f:
+        json.dump(data, f, indent=2)
 
-    base_string = (
-        f"{method.upper()}&"
-        f"{urllib.parse.quote(url, safe='')}&"
-        f"{urllib.parse.quote(param_string, safe='')}"
-    )
 
-    signing_key = (
-        f"{urllib.parse.quote(X_API_SECRET, safe='')}&"
-        f"{urllib.parse.quote(X_ACCESS_SECRET, safe='')}"
-    )
-
-    signature = base64.b64encode(
-        hmac.new(
-            signing_key.encode(), base_string.encode(), hashlib.sha1
-        ).digest()
+def _refresh_access_token(refresh_token: str) -> dict:
+    """Use refresh token to get a new access token."""
+    auth_header = base64.b64encode(
+        f"{X_CLIENT_ID}:{X_CLIENT_SECRET}".encode()
     ).decode()
 
-    oauth_params["oauth_signature"] = signature
-
-    header = "OAuth " + ", ".join(
-        f'{urllib.parse.quote(k, safe="")}="{urllib.parse.quote(v, safe="")}"'
-        for k, v in sorted(oauth_params.items())
+    response = requests.post(
+        TOKEN_URL,
+        headers={
+            "Authorization": f"Basic {auth_header}",
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
+        data={
+            "grant_type": "refresh_token",
+            "refresh_token": refresh_token,
+        },
+        timeout=15,
     )
-    return header
+    response.raise_for_status()
+    return response.json()
 
 
 def post_tweet(text: str) -> dict:
     """Post a tweet to X and return the API response."""
+    tokens = _load_tokens()
+    access_token = tokens["access_token"]
+
     response = requests.post(
         TWEET_URL,
         headers={
-            "Authorization": _oauth_header("POST", TWEET_URL),
+            "Authorization": f"Bearer {access_token}",
             "Content-Type": "application/json",
         },
         json={"text": text},
         timeout=15,
     )
+
+    # If token expired, try refreshing
+    if response.status_code == 401 and "refresh_token" in tokens:
+        new_tokens = _refresh_access_token(tokens["refresh_token"])
+        _save_tokens(new_tokens)
+        response = requests.post(
+            TWEET_URL,
+            headers={
+                "Authorization": f"Bearer {new_tokens['access_token']}",
+                "Content-Type": "application/json",
+            },
+            json={"text": text},
+            timeout=15,
+        )
+
     response.raise_for_status()
     return response.json()
