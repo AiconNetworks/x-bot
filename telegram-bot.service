@@ -1,0 +1,16 @@
+[Unit]
+Description=Aicon Telegram Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=infa
+WorkingDirectory=/home/infa/twitter-bot
+ExecStart=/home/infa/.cache/pypoetry/virtualenvs/aicon-mvp-LZH5YI7U-py3.11/bin/python src/telegram_bot.py
+Restart=always
+RestartSec=5
+EnvironmentFile=/home/infa/twitter-bot/.env
+
+[Install]
+WantedBy=multi-user.target

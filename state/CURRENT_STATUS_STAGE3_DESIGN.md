@@ -225,7 +225,31 @@ HTTP — `sendMessage` and `getUpdates` are just POST requests.
 
 ---
 
-## 12. Intentionally NOT Built Yet
+## 12. Persistent Service (systemd)
+
+The Telegram bot now runs as a systemd service so it stays alive across SSH disconnects,
+VM reboots, and process crashes.
+
+**Service file:** `telegram-bot.service` (installed to `/etc/systemd/system/`)
+
+**Behavior:**
+- Auto-starts on VM boot (`WantedBy=multi-user.target`)
+- Auto-restarts on crash (`Restart=always`, `RestartSec=5`)
+- Runs as user `infa`, working directory `~/twitter-bot`
+- Loads env vars from `.env` via `EnvironmentFile`
+
+**Useful commands:**
+```
+sudo systemctl status telegram-bot     # check status
+sudo journalctl -u telegram-bot -f     # live logs
+sudo systemctl restart telegram-bot    # restart after code changes
+```
+
+**Installed:** 2026-04-02
+
+---
+
+## 13. Intentionally NOT Built Yet
 
 - Inline keyboard buttons (nicer UX, but text replies work fine for MVP)
 - Webhook mode (needs public URL + SSL)
@@ -238,7 +262,7 @@ HTTP — `sendMessage` and `getUpdates` are just POST requests.
 
 ---
 
-## 13. Next Stage Preview
+## 14. Next Stage Preview
 
 **Stage 4:** Trigger the pipeline automatically (cron, webhook, or event-based).
 Right now you still run `main.py` manually. Stage 4 makes the bot truly autonomous —
