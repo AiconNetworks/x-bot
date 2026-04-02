@@ -207,6 +207,8 @@ X_CLIENT_SECRET=...
 
 `.x_tokens.json` is generated automatically.
 
+**Important:** `OPENCLAW_TOKEN` must match the token in `~/.openclaw/openclaw.json` under `gateway.auth.token`. If OpenClaw was reinstalled or onboarded on a new machine, the token will differ from what is in `.env`.
+
 ---
 
 # Running the bot
